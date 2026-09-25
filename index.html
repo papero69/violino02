@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>La mia galleria</title>
+<title>La storia di questo violino</title>
 <meta name="theme-color" content="#e9e6e1" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -142,9 +142,9 @@
 <script>
 /* ================= CONFIG — PERSONALIZZA QUI ================= */
 const CONFIG = {
-  titolo: "la storia di questo violino",
+  titolo: "La storia di questo violino",
   sottotitolo: "Tocca una foto per vederla a schermo intero",
-  cartella: "violino02",          // nome della cartella con le immagini
+  cartella: "",              // cartella con le immagini ("" = pagina principale del repository)
   ordine: "nome",            // "nome" (A→Z) oppure "inverso" (Z→A)
 
   // Di solito NON serve toccare questi: vengono ricavati dall'indirizzo.
@@ -182,12 +182,13 @@ async function leggiFoto() {
   const { utente, repo } = ricavaRepo();
   if (!utente) throw new Error("locale");
   const url = `https://api.github.com/repos/${utente}/${repo}/contents/${CONFIG.cartella}`;
+  const prefisso = CONFIG.cartella ? CONFIG.cartella + "/" : "";
   const r = await fetch(url);
   if (!r.ok) throw new Error("api " + r.status);
   const file = await r.json();
   return file
     .filter((f) => f.type === "file" && ESTENSIONI.test(f.name))
-    .map((f) => `${CONFIG.cartella}/${f.name}`);
+    .map((f) => prefisso + f.name);
 }
 
 let elenco = [], attuale = 0;
@@ -196,7 +197,7 @@ function disegna() {
   const griglia = $("griglia");
   griglia.innerHTML = "";
   if (!elenco.length) {
-    griglia.innerHTML = `<p class="messaggio">La cartella “${CONFIG.cartella}” è vuota.<br>Carica qualche foto su GitHub e ricarica la pagina.</p>`;
+    griglia.innerHTML = `<p class="messaggio">Non ci sono ancora foto.<br>Carica qualche foto su GitHub e ricarica la pagina.</p>`;
     return;
   }
   $("conta").textContent = elenco.length === 1 ? "1 foto" : `${elenco.length} foto`;
@@ -267,7 +268,7 @@ leggiFoto()
     disegna();
   })
   .catch(() => {
-    $("griglia").innerHTML = `<p class="messaggio">Non riesco a leggere la cartella “${CONFIG.cartella}”.<br>Controlla che esista nel repository, oppure elenca i file in <b>fotoManuali</b> dentro index.html.</p>`;
+    $("griglia").innerHTML = `<p class="messaggio">Non riesco a leggere l'elenco delle foto.<br>Controlla che esista nel repository, oppure elenca i file in <b>fotoManuali</b> dentro index.html.</p>`;
   });
 </script>
 </body>
