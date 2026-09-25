@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>La mia galleria</title>
+<meta name="theme-color" content="#e9e6e1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700&display=swap" rel="stylesheet">
+<style>
+  /* ============ PERSONALIZZA QUI ============ */
+  /* Titolo e sottotitolo si cambiano più sotto, nel CONFIG dello script */
+
+  :root {
+    --muro: #e9e6e1;      /* sfondo, come una parete di galleria */
+    --carta: #f6f4f0;
+    --inchiostro: #232326;
+    --grigio: #6d6a66;
+    --accento: #3a5a78;
+    --gap: 6px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --muro: #1c1d20; --carta: #26272b;
+      --inchiostro: #ecebe8; --grigio: #9b9893; --accento: #8fb0cf;
+    }
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { margin: 0; }
+  body {
+    background: var(--muro);
+    color: var(--inchiostro);
+    font-family: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header {
+    padding: 2.2rem 1.1rem 1.4rem;
+    max-width: 1400px; margin: 0 auto;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 9vw, 4.2rem);
+    font-weight: 700; line-height: .95; letter-spacing: -.03em;
+    margin: 0 0 .5rem;
+  }
+  .sotto { color: var(--grigio); font-size: 1rem; margin: 0; }
+  .conta { color: var(--grigio); font-size: .9rem; margin-top: .3rem; }
+
+  /* Griglia a "mattoni": ogni foto mantiene le sue proporzioni */
+  main {
+    columns: 2; column-gap: var(--gap);
+    padding: 0 var(--gap) var(--gap);
+    max-width: 1400px; margin: 0 auto;
+  }
+  @media (min-width: 700px)  { main { columns: 3; } }
+  @media (min-width: 1100px) { main { columns: 4; } }
+
+  .foto {
+    display: block; width: 100%; margin: 0 0 var(--gap);
+    padding: 0; border: 0; background: var(--carta);
+    border-radius: 3px; overflow: hidden; cursor: zoom-in;
+    break-inside: avoid;
+  }
+  .foto img {
+    display: block; width: 100%; height: auto;
+    opacity: 0; transition: opacity .4s ease;
+  }
+  .foto img.pronta { opacity: 1; }
+  .foto:focus-visible { outline: 3px solid var(--accento); outline-offset: 2px; }
+
+  .messaggio {
+    column-span: all; padding: 3rem 1rem; text-align: center;
+    color: var(--grigio); line-height: 1.5;
+  }
+
+  /* Visualizzatore a schermo intero */
+  #vista {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(12, 12, 14, .97);
+    display: none; touch-action: pan-y;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  }
+  #vista.aperta { display: flex; flex-direction: column; }
+  #vista .palco {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    overflow: hidden; min-height: 0;
+  }
+  #vista img {
+    max-width: 100%; max-height: 100%; object-fit: contain;
+    user-select: none; -webkit-user-drag: none;
+    transition: transform .25s ease;
+  }
+  #vista .barra {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .6rem .8rem; color: #d8d6d2; font-size: .95rem;
+  }
+  #vista button {
+    background: none; border: 0; color: #f0eee9;
+    font: inherit; font-size: 1.6rem; line-height: 1;
+    width: 48px; height: 48px; border-radius: 50%; cursor: pointer;
+  }
+  #vista button:focus-visible { outline: 2px solid #8fb0cf; }
+  #vista .frecce { display: flex; gap: .2rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .foto img, #vista img { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="titolo"></h1>
+  <p class="sotto" id="sottotitolo"></p>
+  <p class="conta" id="conta"></p>
+</header>
+
+<main id="griglia" aria-live="polite">
+  <p class="messaggio">Caricamento delle foto…</p>
+</main>
+
+<div id="vista" role="dialog" aria-modal="true" aria-label="Foto a schermo intero">
+  <div class="barra">
+    <span id="posizione"></span>
+    <button id="chiudi" aria-label="Chiudi">✕</button>
+  </div>
+  <div class="palco"><img id="grande" alt=""></div>
+  <div class="barra">
+    <span></span>
+    <div class="frecce">
+      <button id="prec" aria-label="Foto precedente">‹</button>
+      <button id="succ" aria-label="Foto successiva">›</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= CONFIG — PERSONALIZZA QUI ================= */
+const CONFIG = {
+  titolo: "La mia galleria",
+  sottotitolo: "Tocca una foto per vederla a schermo intero",
+  cartella: "foto",          // nome della cartella con le immagini
+  ordine: "nome",            // "nome" (A→Z) oppure "inverso" (Z→A)
+
+  // Di solito NON serve toccare questi: vengono ricavati dall'indirizzo.
+  utente: "",                // es. "mariorossi"
+  repository: "",            // es. "galleria"
+
+  // Piano B: se la lettura automatica non funziona, elenca qui i file.
+  fotoManuali: [
+    // "foto/tramonto.jpg",
+    // "foto/mare.jpg",
+  ],
+};
+/* ============================================================= */
+
+const ESTENSIONI = /\.(jpe?g|png|webp|gif|avif)$/i;
+const $ = (id) => document.getElementById(id);
+$("titolo").textContent = CONFIG.titolo;
+$("sottotitolo").textContent = CONFIG.sottotitolo;
+document.title = CONFIG.titolo;
+
+function ricavaRepo() {
+  let utente = CONFIG.utente, repo = CONFIG.repository;
+  const host = location.hostname;
+  if (!utente && host.endsWith(".github.io")) utente = host.split(".")[0];
+  if (!repo) {
+    const primo = location.pathname.split("/").filter(Boolean)[0];
+    // sito "utente.github.io" oppure "utente.github.io/nome-repo"
+    repo = primo && !primo.includes(".") ? primo : host;
+  }
+  return { utente, repo };
+}
+
+async function leggiFoto() {
+  if (CONFIG.fotoManuali.length) return CONFIG.fotoManuali;
+  const { utente, repo } = ricavaRepo();
+  if (!utente) throw new Error("locale");
+  const url = `https://api.github.com/repos/${utente}/${repo}/contents/${CONFIG.cartella}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("api " + r.status);
+  const file = await r.json();
+  return file
+    .filter((f) => f.type === "file" && ESTENSIONI.test(f.name))
+    .map((f) => `${CONFIG.cartella}/${f.name}`);
+}
+
+let elenco = [], attuale = 0;
+
+function disegna() {
+  const griglia = $("griglia");
+  griglia.innerHTML = "";
+  if (!elenco.length) {
+    griglia.innerHTML = `<p class="messaggio">La cartella “${CONFIG.cartella}” è vuota.<br>Carica qualche foto su GitHub e ricarica la pagina.</p>`;
+    return;
+  }
+  $("conta").textContent = elenco.length === 1 ? "1 foto" : `${elenco.length} foto`;
+  elenco.forEach((src, i) => {
+    const b = document.createElement("button");
+    b.className = "foto";
+    b.setAttribute("aria-label", `Apri foto ${i + 1}`);
+    const img = document.createElement("img");
+    img.loading = i < 6 ? "eager" : "lazy";
+    img.decoding = "async";
+    img.alt = "";
+    img.src = src;
+    img.onload = () => img.classList.add("pronta");
+    b.appendChild(img);
+    b.onclick = () => apri(i);
+    griglia.appendChild(b);
+  });
+}
+
+function mostra(i) {
+  attuale = (i + elenco.length) % elenco.length;
+  $("grande").src = elenco[attuale];
+  $("posizione").textContent = `${attuale + 1} / ${elenco.length}`;
+  // precarica la successiva per uno scorrimento fluido
+  new Image().src = elenco[(attuale + 1) % elenco.length];
+}
+function apri(i) {
+  mostra(i);
+  $("vista").classList.add("aperta");
+  document.body.style.overflow = "hidden";
+  $("chiudi").focus();
+}
+function chiudi() {
+  $("vista").classList.remove("aperta");
+  document.body.style.overflow = "";
+  document.querySelectorAll(".foto")[attuale]?.focus();
+}
+
+$("chiudi").onclick = chiudi;
+$("prec").onclick = () => mostra(attuale - 1);
+$("succ").onclick = () => mostra(attuale + 1);
+document.addEventListener("keydown", (e) => {
+  if (!$("vista").classList.contains("aperta")) return;
+  if (e.key === "Escape") chiudi();
+  if (e.key === "ArrowLeft") mostra(attuale - 1);
+  if (e.key === "ArrowRight") mostra(attuale + 1);
+});
+
+// Scorrimento col dito
+let x0 = null, y0 = null;
+const vista = $("vista");
+vista.addEventListener("touchstart", (e) => {
+  x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+}, { passive: true });
+vista.addEventListener("touchend", (e) => {
+  if (x0 === null) return;
+  const dx = e.changedTouches[0].clientX - x0;
+  const dy = e.changedTouches[0].clientY - y0;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) mostra(attuale + (dx < 0 ? 1 : -1));
+  else if (dy > 90) chiudi(); // trascina verso il basso per chiudere
+  x0 = null;
+});
+
+leggiFoto()
+  .then((f) => {
+    elenco = f.sort((a, b) => a.localeCompare(b, "it", { numeric: true }));
+    if (CONFIG.ordine === "inverso") elenco.reverse();
+    disegna();
+  })
+  .catch(() => {
+    $("griglia").innerHTML = `<p class="messaggio">Non riesco a leggere la cartella “${CONFIG.cartella}”.<br>Controlla che esista nel repository, oppure elenca i file in <b>fotoManuali</b> dentro index.html.</p>`;
+  });
+</script>
+</body>
+</html>
